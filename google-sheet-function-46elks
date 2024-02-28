@@ -1,0 +1,43 @@
+function sendElksSMS() {
+  // Get the properties 
+  var prop = PropertiesService.getScriptProperties();
+  var username = prop.getProperty('46elksUsername');
+  var password = prop.getProperty('46elksPassword');
+  var sender = prop.getProperty('46elksSender');
+  var auth = Utilities.base64Encode(username + ":" + password);
+  
+  // Access the spreadsheet directly
+  var ss = SpreadsheetApp.getActive();
+  var sheet = ss.getSheets()[0];
+
+  var range = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  
+  // Loop over all rows in the range and send the SMS
+  for (var i = 0; i < range.length; i++) {
+    if (range[i][1] == '') continue;
+
+    var state = sheet.getRange(2 + i, 4);
+    var info = sheet.getRange(2 + i, 5);
+
+    // Extract the count of previous sends
+    var previousCount = (range[i][3].match(/\d+/) || [0])[0];
+    var newCount = Number(previousCount) + 1;
+
+    try {
+      UrlFetchApp.fetch("https://api.46elks.com/a1/SMS", {
+        "method": "post",
+        "headers": { "Authorization": "Basic " + auth },
+        "payload": {
+          "from" : sender,
+          "to" : '+' + range[i][1],
+          "message" : range[i][2]
+        }
+      });
+      state.setValue('Sent ' + newCount).setBackground('#93c47d'); // Set count in status
+      info.setValue('Sent on ' + new Date());
+    } catch (err) {
+      state.setValue('FAILED').setBackground('#e06666');
+      info.setValue(String(err).replace('\n', ''));
+    }
+  }
+}
